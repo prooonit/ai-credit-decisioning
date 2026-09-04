@@ -9,6 +9,9 @@ Production-oriented backend foundation for a future multi-tenant credit decision
 3. Generate the Prisma client with `npm run prisma:generate`.
 4. Start development mode with `npm run dev`.
 
+To create the initial PostgreSQL schema, run `npm run prisma:migrate -- --name init_multitenancy`.
+For local development data, run `npx prisma db seed` after migrating.
+
 ## Available commands
 
 - `npm run dev` — run the API with file watching.
