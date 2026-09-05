@@ -18,3 +18,10 @@ export class RequestValidationError extends AppError {
     this.name = 'RequestValidationError';
   }
 }
+
+export class ConflictError extends AppError {
+  constructor(message: string) {
+    super(message, 409, 'CONFLICT');
+    this.name = 'ConflictError';
+  }
+}

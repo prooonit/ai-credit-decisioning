@@ -1,15 +1,11 @@
-import { scryptSync } from 'node:crypto';
-
 import dotenv from 'dotenv';
 
 import { PrismaClient, TenantStatus, UserRole } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
 const prisma = new PrismaClient();
-
-const developmentPasswordHash = (password: string) =>
-  `scrypt$development-only-salt$${scryptSync(password, 'development-only-salt', 64).toString('hex')}`;
 
 const seed = async () => {
   const tenant = await prisma.tenant.upsert({
@@ -26,24 +22,29 @@ const seed = async () => {
   });
 
   const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@example.test';
-  await prisma.user.upsert({
-    where: { tenantId_email: { tenantId: tenant.id, email } },
+  const user = await prisma.user.upsert({
+    where: { email },
     update: {
       name: process.env.SEED_ADMIN_NAME ?? 'Development Admin',
-      role: UserRole.ADMIN,
-      passwordHash: developmentPasswordHash(
+      passwordHash: await bcrypt.hash(
         process.env.SEED_ADMIN_PASSWORD ?? 'change-me-in-development',
+        12,
       ),
     },
     create: {
-      tenantId: tenant.id,
       email,
       name: process.env.SEED_ADMIN_NAME ?? 'Development Admin',
-      role: UserRole.ADMIN,
-      passwordHash: developmentPasswordHash(
+      passwordHash: await bcrypt.hash(
         process.env.SEED_ADMIN_PASSWORD ?? 'change-me-in-development',
+        12,
       ),
     },
+  });
+
+  await prisma.userTenantMembership.upsert({
+    where: { userId_tenantId: { userId: user.id, tenantId: tenant.id } },
+    update: { role: UserRole.ADMIN },
+    create: { userId: user.id, tenantId: tenant.id, role: UserRole.ADMIN },
   });
 
   console.info(`Seeded development tenant: ${tenant.slug}`);

@@ -1,28 +1,28 @@
-import type { Prisma, PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+
+import type { TenantContext } from '../../lib/tenant-context.js';
 
 /**
  * Data access for tenant-owned users. Every query accepts a tenantId so callers
  * cannot accidentally read or mutate users across tenant boundaries.
  */
 export const userRepository = {
-  listByTenant: (prisma: PrismaClient, tenantId: string) =>
-    prisma.user.findMany({
-      where: { tenantId },
+  listByTenant: (prisma: PrismaClient, context: TenantContext) =>
+    prisma.userTenantMembership.findMany({
+      where: { tenantId: context.tenantId },
       orderBy: { createdAt: 'asc' },
+      include: { user: true },
     }),
 
-  findById: (prisma: PrismaClient, tenantId: string, userId: string) =>
-    prisma.user.findFirst({
-      where: { id: userId, tenantId },
+  findById: (prisma: PrismaClient, context: TenantContext, userId: string) =>
+    prisma.userTenantMembership.findFirst({
+      where: { userId, tenantId: context.tenantId },
+      include: { user: true },
     }),
 
-  findByEmail: (prisma: PrismaClient, tenantId: string, email: string) =>
-    prisma.user.findUnique({
-      where: { tenantId_email: { tenantId, email } },
-    }),
-
-  create: (prisma: PrismaClient, tenantId: string, data: Prisma.UserCreateWithoutTenantInput) =>
-    prisma.user.create({
-      data: { ...data, tenantId },
+  findByEmail: (prisma: PrismaClient, context: TenantContext, email: string) =>
+    prisma.userTenantMembership.findFirst({
+      where: { tenantId: context.tenantId, user: { email } },
+      include: { user: true },
     }),
 };

@@ -14,6 +14,7 @@ enum TenantStatus {
 }
 
 enum UserRole {
+  OWNER
   ADMIN
   ANALYST
   VIEWER
@@ -28,21 +29,34 @@ model Tenant {
   updatedAt DateTime     @updatedAt
 
   // All tenant-owned models should reference this model through a tenantId UUID.
-  users User[]
+  memberships UserTenantMembership[]
 }
 
 model User {
   id           String   @id @default(uuid()) @db.Uuid
-  tenantId     String   @db.Uuid
   email        String
   name         String
-  role         UserRole @default(VIEWER)
   passwordHash String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  memberships UserTenantMembership[]
 
-  @@unique([tenantId, email])
+  @@unique([email])
+}
+
+model UserTenantMembership {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tenantId  String   @db.Uuid
+  role      UserRole @default(VIEWER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, tenantId])
   @@index([tenantId])
+  @@index([userId])
 }
