@@ -7,6 +7,7 @@ import { SyntheticBankingProvider, SyntheticCreditProvider, SyntheticIdentityPro
 import { PolicyEngine } from '../policy/policy.engine.js';
 import { PolicyRepository } from '../policy/policy.repository.js';
 import { creditPolicyConfigurationSchema, type DecisionInput } from '../policy/policy.types.js';
+import { toEvaluationEvidence, type EvaluationEvidence } from './decision.types.js';
 
 const sum = (values: string[]) => values.reduce((total, value) => total.plus(value), new Prisma.Decimal(0));
 
@@ -22,7 +23,11 @@ export class CreditDecisionService {
     );
   }
 
-  async evaluate(context: TenantContext, applicationId: string) {
+  async evaluate(
+    context: TenantContext,
+    applicationId: string,
+    onEvidence?: (evidence: EvaluationEvidence) => Promise<void>,
+  ) {
     const application = await this.prisma.loanApplication.findFirst({
       where: { id: applicationId, tenantId: context.tenantId },
       include: { customer: true, creditDecision: true },
@@ -63,6 +68,14 @@ export class CreditDecisionService {
           identityStatus: profile.identity?.status ?? null,
         },
       };
+      // AI analysis is intentionally best-effort. It cannot alter or interrupt policy evaluation.
+      if (onEvidence) {
+        try {
+          await onEvidence(toEvaluationEvidence(input));
+        } catch {
+          // The agent reports AI unavailability while this service proceeds deterministically.
+        }
+      }
       const evaluated = PolicyEngine.evaluate(input, configuration);
       const result = await this.prisma.$transaction(async (tx) => {
         const decision = await tx.creditDecision.create({ data: {
