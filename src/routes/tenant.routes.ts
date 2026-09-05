@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { AppError } from '../lib/errors.js';
 import { authenticate } from '../middleware/authenticate.js';
-import { validateRequest } from '../middleware/validate-request.js';
+import { getValidated, validateRequest } from '../middleware/validate-request.js';
 import { tenantService } from '../modules/tenants/tenant.service.js';
 
 const tenantSchema = z.object({
@@ -43,7 +43,7 @@ export const createTenantRouter = (prisma: PrismaClient) => {
       const { tenant, membership } = await tenantService.create(
         prisma,
         req.auth!.userId,
-        req.body as z.infer<typeof tenantSchema>,
+        getValidated<z.infer<typeof tenantSchema>>(req, 'body'),
       );
       res.status(201).json({
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, status: tenant.status },
@@ -68,7 +68,7 @@ export const createTenantRouter = (prisma: PrismaClient) => {
     validateRequest(tenantParamsSchema, 'params'),
     async (req, res, next) => {
       try {
-        const { tenantId } = req.params as z.infer<typeof tenantParamsSchema>;
+        const { tenantId } = getValidated<z.infer<typeof tenantParamsSchema>>(req, 'params');
         const membership = await tenantService.findForUser(prisma, req.auth!.userId, tenantId);
         if (!membership) {
           throw new AppError(

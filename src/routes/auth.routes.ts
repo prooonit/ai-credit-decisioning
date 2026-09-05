@@ -6,7 +6,7 @@ import { authService } from '../auth/auth.service.js';
 import { signAccessToken } from '../auth/jwt.js';
 import { AppError } from '../lib/errors.js';
 import { authenticate } from '../middleware/authenticate.js';
-import { validateRequest } from '../middleware/validate-request.js';
+import { getValidated, validateRequest } from '../middleware/validate-request.js';
 
 const registerSchema = z.object({
   email: z
@@ -40,9 +40,8 @@ export const createAuthRouter = (prisma: PrismaClient) => {
     try {
       const { user, tenant } = await authService.register(
         prisma,
-        req.body as z.infer<typeof registerSchema>,
+        getValidated<z.infer<typeof registerSchema>>(req, 'body'),
       );
-      console.log('User registered:', req.body);
       const accessToken = await signAccessToken(user.id);
       res.status(201).json({
         accessToken,
@@ -56,7 +55,7 @@ export const createAuthRouter = (prisma: PrismaClient) => {
 
   router.post('/login', validateRequest(loginSchema), async (req, res, next) => {
     try {
-      const { email, password } = req.body as z.infer<typeof loginSchema>;
+      const { email, password } = getValidated<z.infer<typeof loginSchema>>(req, 'body');
       const user = await authService.login(prisma, email, password);
       res.status(200).json({ accessToken: await signAccessToken(user.id) });
     } catch (error) {

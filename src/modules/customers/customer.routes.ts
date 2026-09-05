@@ -8,7 +8,7 @@ import { formatMoney } from '../../lib/money.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireRole } from '../../middleware/require-role.js';
 import { createTenantContext } from '../../middleware/tenant-context.js';
-import { validateRequest } from '../../middleware/validate-request.js';
+import { getValidated, validateRequest } from '../../middleware/validate-request.js';
 import {
   customerCreateSchema,
   customerListSchema,
@@ -34,7 +34,7 @@ export const createCustomerRouter = (prisma: PrismaClient) => {
         const customer = await customerService.create(
           prisma,
           req.tenantContext!,
-          req.body as z.infer<typeof customerCreateSchema>,
+          getValidated<z.infer<typeof customerCreateSchema>>(req, 'body'),
         );
         res.status(201).json({ customer: serialize(customer) });
       } catch (error) {
@@ -45,7 +45,7 @@ export const createCustomerRouter = (prisma: PrismaClient) => {
 
   router.get('/', validateRequest(customerListSchema, 'query'), async (req, res, next) => {
     try {
-      const { page, pageSize } = req.query as unknown as z.infer<typeof customerListSchema>;
+      const { page, pageSize } = getValidated<z.infer<typeof customerListSchema>>(req, 'query');
       const result = await customerService.list(prisma, req.tenantContext!, page, pageSize);
       res
         .status(200)
@@ -57,7 +57,7 @@ export const createCustomerRouter = (prisma: PrismaClient) => {
 
   router.get('/:id', validateRequest(customerParamsSchema, 'params'), async (req, res, next) => {
     try {
-      const { id } = req.params as z.infer<typeof customerParamsSchema>;
+      const { id } = getValidated<z.infer<typeof customerParamsSchema>>(req, 'params');
       const customer = await customerService.findById(prisma, req.tenantContext!, id);
       if (!customer) throw new AppError('Customer not found', 404, 'NOT_FOUND');
       res.status(200).json({ customer: serialize(customer) });

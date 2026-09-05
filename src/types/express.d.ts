@@ -5,6 +5,7 @@ declare global {
     interface Request {
       auth?: { userId: string };
       tenantContext?: TenantContext;
+      validated?: Partial<Record<'body' | 'params' | 'query', unknown>>;
     }
   }
 }

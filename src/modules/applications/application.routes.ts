@@ -8,7 +8,7 @@ import { formatMoney } from '../../lib/money.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireRole } from '../../middleware/require-role.js';
 import { createTenantContext } from '../../middleware/tenant-context.js';
-import { validateRequest } from '../../middleware/validate-request.js';
+import { getValidated, validateRequest } from '../../middleware/validate-request.js';
 import {
   applicationCreateSchema,
   applicationListSchema,
@@ -34,7 +34,7 @@ export const createApplicationRouter = (prisma: PrismaClient) => {
         const application = await applicationService.create(
           prisma,
           req.tenantContext!,
-          req.body as z.infer<typeof applicationCreateSchema>,
+          getValidated<z.infer<typeof applicationCreateSchema>>(req, 'body'),
         );
         res.status(201).json({ application: serialize(application) });
       } catch (error) {
@@ -45,7 +45,7 @@ export const createApplicationRouter = (prisma: PrismaClient) => {
 
   router.get('/', validateRequest(applicationListSchema, 'query'), async (req, res, next) => {
     try {
-      const input = req.query as unknown as z.infer<typeof applicationListSchema>;
+      const input = getValidated<z.infer<typeof applicationListSchema>>(req, 'query');
       const result = await applicationService.list(prisma, req.tenantContext!, input);
       res.status(200).json({
         applications: result.applications.map(serialize),
@@ -60,7 +60,7 @@ export const createApplicationRouter = (prisma: PrismaClient) => {
 
   router.get('/:id', validateRequest(applicationParamsSchema, 'params'), async (req, res, next) => {
     try {
-      const { id } = req.params as z.infer<typeof applicationParamsSchema>;
+      const { id } = getValidated<z.infer<typeof applicationParamsSchema>>(req, 'params');
       const application = await applicationService.findById(prisma, req.tenantContext!, id);
       if (!application) throw new AppError('Loan application not found', 404, 'NOT_FOUND');
       res.status(200).json({ application: serialize(application) });
