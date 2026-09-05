@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 
 import {
   BankAccountType,
+  CreditPolicyStatus,
   EmploymentType,
   IdentityVerificationStatus,
   LiabilityStatus,
@@ -83,6 +84,30 @@ const seed = async () => {
   });
 
   // =========================================================
+  // ACTIVE CREDIT POLICY
+  // =========================================================
+
+  await prisma.creditPolicy.upsert({
+    where: { tenantId_version: { tenantId: tenant.id, version: 1 } },
+    update: {
+      name: 'Standard Credit Policy', status: CreditPolicyStatus.ACTIVE,
+      configuration: {
+        minimumCreditScore: 700, minimumMonthlyIncome: '50000.00',
+        maximumDebtToIncomeRatio: '0.40', maximumLatePayments: 2,
+        identityVerificationRequired: true,
+      },
+    },
+    create: {
+      tenantId: tenant.id, name: 'Standard Credit Policy', version: 1, status: CreditPolicyStatus.ACTIVE,
+      configuration: {
+        minimumCreditScore: 700, minimumMonthlyIncome: '50000.00',
+        maximumDebtToIncomeRatio: '0.40', maximumLatePayments: 2,
+        identityVerificationRequired: true,
+      },
+    },
+  });
+
+  // =========================================================
   // FIND EXISTING CUSTOMER
   // =========================================================
 
@@ -90,19 +115,14 @@ const seed = async () => {
     process.env.SEED_CUSTOMER_EXTERNAL_REFERENCE ??
     'CUSTOMER-001';
 
-  const customer = await prisma.customer.findFirst({
-    where: {
-      tenantId: tenant.id,
-      externalReference: customerExternalReference,
+  const customer = await prisma.customer.upsert({
+    where: { tenantId_externalReference: { tenantId: tenant.id, externalReference: customerExternalReference } },
+    update: {},
+    create: {
+      tenantId: tenant.id, externalReference: customerExternalReference, fullName: 'Approved Synthetic Customer',
+      dateOfBirth: new Date('1990-01-01'), employmentType: EmploymentType.SALARIED, monthlyIncome: '75000.00',
     },
   });
-
-  if (!customer) {
-    throw new Error(
-      `Customer with externalReference "${customerExternalReference}" was not found for tenant "${tenant.slug}". ` +
-        `Create the customer first using the API or set the correct SEED_TENANT_SLUG.`,
-    );
-  }
 
   console.info(
     `Using existing customer: ${customer.fullName} (${customer.id})`,
@@ -286,12 +306,45 @@ const seed = async () => {
     },
   });
 
+  // Additional deterministic profiles exercise the remaining policy outcomes.
+  const rejectedCustomer = await prisma.customer.upsert({
+    where: { tenantId_externalReference: { tenantId: tenant.id, externalReference: 'CUSTOMER-REJECTED-001' } },
+    update: { monthlyIncome: '75000.00' },
+    create: { tenantId: tenant.id, externalReference: 'CUSTOMER-REJECTED-001', fullName: 'Rejected Synthetic Customer', dateOfBirth: new Date('1991-01-01'), employmentType: EmploymentType.SALARIED, monthlyIncome: '75000.00' },
+  });
+  await prisma.creditProfile.upsert({
+    where: { customerId: rejectedCustomer.id },
+    update: { tenantId: tenant.id, creditScore: 620, totalOutstanding: '10000.00', latePayments: 0, totalAccounts: 2, activeAccounts: 1, hardInquiries: 0, creditAgeMonths: 24 },
+    create: { tenantId: tenant.id, customerId: rejectedCustomer.id, creditScore: 620, totalOutstanding: '10000.00', latePayments: 0, totalAccounts: 2, activeAccounts: 1, hardInquiries: 0, creditAgeMonths: 24 },
+  });
+  await prisma.identityVerification.upsert({
+    where: { id: '00000000-0000-4000-8000-000000000006' },
+    update: { tenantId: tenant.id, customerId: rejectedCustomer.id, status: IdentityVerificationStatus.VERIFIED, provider: 'Synthetic Identity Provider', reference: 'SYNTH-VERIFY-REJECTED', verifiedAt: new Date('2026-01-01') },
+    create: { id: '00000000-0000-4000-8000-000000000006', tenantId: tenant.id, customerId: rejectedCustomer.id, status: IdentityVerificationStatus.VERIFIED, provider: 'Synthetic Identity Provider', reference: 'SYNTH-VERIFY-REJECTED', verifiedAt: new Date('2026-01-01') },
+  });
+
+  const reviewCustomer = await prisma.customer.upsert({
+    where: { tenantId_externalReference: { tenantId: tenant.id, externalReference: 'CUSTOMER-REVIEW-001' } },
+    update: { monthlyIncome: '75000.00' },
+    create: { tenantId: tenant.id, externalReference: 'CUSTOMER-REVIEW-001', fullName: 'Manual Review Synthetic Customer', dateOfBirth: new Date('1992-01-01'), employmentType: EmploymentType.SALARIED, monthlyIncome: '75000.00' },
+  });
+  await prisma.creditProfile.upsert({
+    where: { customerId: reviewCustomer.id },
+    update: { tenantId: tenant.id, creditScore: 742, totalOutstanding: '10000.00', latePayments: 0, totalAccounts: 2, activeAccounts: 1, hardInquiries: 0, creditAgeMonths: 24 },
+    create: { tenantId: tenant.id, customerId: reviewCustomer.id, creditScore: 742, totalOutstanding: '10000.00', latePayments: 0, totalAccounts: 2, activeAccounts: 1, hardInquiries: 0, creditAgeMonths: 24 },
+  });
+  await prisma.identityVerification.upsert({
+    where: { id: '00000000-0000-4000-8000-000000000007' },
+    update: { tenantId: tenant.id, customerId: reviewCustomer.id, status: IdentityVerificationStatus.PENDING, provider: 'Synthetic Identity Provider', reference: 'SYNTH-VERIFY-REVIEW', verifiedAt: null },
+    create: { id: '00000000-0000-4000-8000-000000000007', tenantId: tenant.id, customerId: reviewCustomer.id, status: IdentityVerificationStatus.PENDING, provider: 'Synthetic Identity Provider', reference: 'SYNTH-VERIFY-REVIEW', verifiedAt: null },
+  });
+
   console.info('----------------------------------------');
   console.info(`Tenant: ${tenant.name}`);
   console.info(`Tenant ID: ${tenant.id}`);
   console.info(`Customer: ${customer.fullName}`);
   console.info(`Customer ID: ${customer.id}`);
-  console.info('Financial data seeded successfully');
+  console.info('Financial data and approved/rejected/manual-review policy profiles seeded successfully');
   console.info('----------------------------------------');
 };
 

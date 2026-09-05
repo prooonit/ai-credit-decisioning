@@ -5,6 +5,7 @@ import { prisma as defaultPrisma } from './lib/prisma.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { createAuthRouter } from './routes/auth.routes.js';
 import { createApplicationRouter } from './modules/applications/application.routes.js';
+import { createDecisionRouter } from './modules/decision/decision.routes.js';
 import { createCustomerRouter } from './modules/customers/customer.routes.js';
 import { createFinancialRouter } from './modules/financial/financial.routes.js';
 import { healthRouter } from './routes/health.routes.js';
@@ -24,6 +25,7 @@ export const createApp = (dependencies: { prisma?: PrismaClient } = {}) => {
   app.use('/api/v1/customers', createCustomerRouter(prisma));
   app.use('/api/v1/customers', createFinancialRouter(prisma));
   app.use('/api/v1/applications', createApplicationRouter(prisma));
+  app.use('/api/v1/applications', createDecisionRouter(prisma));
   app.use(notFoundHandler);
   app.use(errorHandler);
 

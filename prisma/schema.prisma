@@ -43,6 +43,18 @@ enum ApplicationStatus {
   FAILED
 }
 
+enum CreditPolicyStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CreditDecisionOutcome {
+  APPROVED
+  REJECTED
+  MANUAL_REVIEW
+}
+
 enum BankAccountType {
   SAVINGS
   CURRENT
@@ -84,19 +96,21 @@ enum IdentityVerificationStatus {
 }
 
 model Tenant {
-  id           String            @id @default(uuid()) @db.Uuid
-  name         String
-  slug         String            @unique
-  status       TenantStatus      @default(ACTIVE)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  customers    Customer[]
-  applications LoanApplication[]
-  creditProfiles CreditProfile[]
-  bankAccounts BankAccount[]
-  bankTransactions BankTransaction[]
-  liabilities Liability[]
+  id                    String                 @id @default(uuid()) @db.Uuid
+  name                  String
+  slug                  String                 @unique
+  status                TenantStatus           @default(ACTIVE)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  customers             Customer[]
+  applications          LoanApplication[]
+  creditProfiles        CreditProfile[]
+  bankAccounts          BankAccount[]
+  bankTransactions      BankTransaction[]
+  liabilities           Liability[]
   identityVerifications IdentityVerification[]
+  creditPolicies        CreditPolicy[]
+  creditDecisions       CreditDecision[]
 
   // All tenant-owned models should reference this model through a tenantId UUID.
   memberships UserTenantMembership[]
@@ -143,12 +157,12 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  applications LoanApplication[]
-  creditProfile CreditProfile?
-  bankAccounts BankAccount[]
-  bankTransactions BankTransaction[]
-  liabilities Liability[]
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  applications          LoanApplication[]
+  creditProfile         CreditProfile?
+  bankAccounts          BankAccount[]
+  bankTransactions      BankTransaction[]
+  liabilities           Liability[]
   identityVerifications IdentityVerification[]
 
   @@unique([tenantId, externalReference])
@@ -157,92 +171,97 @@ model Customer {
 }
 
 model CreditProfile {
-  id String @id @default(uuid()) @db.Uuid
-  tenantId String @db.Uuid
-  customerId String @unique @db.Uuid
-  creditScore Int
-  totalAccounts Int
-  activeAccounts Int
-  totalOutstanding Decimal @db.Decimal(15, 2)
-  latePayments Int
-  hardInquiries Int
-  creditAgeMonths Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @db.Uuid
+  customerId       String   @unique @db.Uuid
+  creditScore      Int
+  totalAccounts    Int
+  activeAccounts   Int
+  totalOutstanding Decimal  @db.Decimal(15, 2)
+  latePayments     Int
+  hardInquiries    Int
+  creditAgeMonths  Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer         Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   @@index([tenantId, customerId])
 }
 
 model BankAccount {
-  id String @id @default(uuid()) @db.Uuid
-  tenantId String @db.Uuid
-  customerId String @db.Uuid
-  institutionName String
-  accountType BankAccountType
+  id                  String            @id @default(uuid()) @db.Uuid
+  tenantId            String            @db.Uuid
+  customerId          String            @db.Uuid
+  institutionName     String
+  accountType         BankAccountType
   maskedAccountNumber String
-  currentBalance Decimal @db.Decimal(15, 2)
-  availableBalance Decimal @db.Decimal(15, 2)
-  openedAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  transactions BankTransaction[]
+  currentBalance      Decimal           @db.Decimal(15, 2)
+  availableBalance    Decimal           @db.Decimal(15, 2)
+  openedAt            DateTime
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer            Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  transactions        BankTransaction[]
+
   @@index([tenantId, customerId])
 }
 
 model BankTransaction {
-  id String @id @default(uuid()) @db.Uuid
-  tenantId String @db.Uuid
-  bankAccountId String @db.Uuid
-  customerId String @db.Uuid
+  id              String              @id @default(uuid()) @db.Uuid
+  tenantId        String              @db.Uuid
+  bankAccountId   String              @db.Uuid
+  customerId      String              @db.Uuid
   transactionDate DateTime
-  type BankTransactionType
-  amount Decimal @db.Decimal(15, 2)
-  category TransactionCategory
-  description String
-  balanceAfter Decimal @db.Decimal(15, 2)
-  createdAt DateTime @default(now())
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  type            BankTransactionType
+  amount          Decimal             @db.Decimal(15, 2)
+  category        TransactionCategory
+  description     String
+  balanceAfter    Decimal             @db.Decimal(15, 2)
+  createdAt       DateTime            @default(now())
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer        Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  bankAccount     BankAccount         @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
   @@index([tenantId, customerId, transactionDate])
   @@index([tenantId, bankAccountId])
 }
 
 model Liability {
-  id String @id @default(uuid()) @db.Uuid
-  tenantId String @db.Uuid
-  customerId String @db.Uuid
-  type LiabilityType
-  lenderName String
-  originalAmount Decimal @db.Decimal(15, 2)
-  outstandingAmount Decimal @db.Decimal(15, 2)
-  monthlyEmi Decimal @db.Decimal(15, 2)
-  interestRate Decimal @db.Decimal(5, 2)
-  startDate DateTime
-  endDate DateTime?
-  status LiabilityStatus
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @db.Uuid
+  customerId        String          @db.Uuid
+  type              LiabilityType
+  lenderName        String
+  originalAmount    Decimal         @db.Decimal(15, 2)
+  outstandingAmount Decimal         @db.Decimal(15, 2)
+  monthlyEmi        Decimal         @db.Decimal(15, 2)
+  interestRate      Decimal         @db.Decimal(5, 2)
+  startDate         DateTime
+  endDate           DateTime?
+  status            LiabilityStatus
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer          Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   @@index([tenantId, customerId])
 }
 
 model IdentityVerification {
-  id String @id @default(uuid()) @db.Uuid
-  tenantId String @db.Uuid
-  customerId String @db.Uuid
-  status IdentityVerificationStatus
-  provider String
-  reference String
+  id         String                     @id @default(uuid()) @db.Uuid
+  tenantId   String                     @db.Uuid
+  customerId String                     @db.Uuid
+  status     IdentityVerificationStatus
+  provider   String
+  reference  String
   verifiedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime                   @default(now())
+  updatedAt  DateTime                   @updatedAt
+  tenant     Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer                   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   @@index([tenantId, customerId])
 }
 
@@ -257,11 +276,47 @@ model LoanApplication {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  creditDecision CreditDecision?
 
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, customerId])
+  @@index([tenantId, createdAt])
+}
+
+model CreditPolicy {
+  id            String             @id @default(uuid()) @db.Uuid
+  tenantId      String             @db.Uuid
+  name          String
+  version       Int
+  status        CreditPolicyStatus @default(DRAFT)
+  configuration Json
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  decisions CreditDecision[]
+
+  @@unique([tenantId, version])
+  @@index([tenantId, status])
+}
+
+model CreditDecision {
+  id            String                @id @default(uuid()) @db.Uuid
+  tenantId      String                @db.Uuid
+  applicationId String                @unique @db.Uuid
+  policyId      String                @db.Uuid
+  policyVersion Int
+  decision      CreditDecisionOutcome
+  ruleResults   Json
+  createdAt     DateTime              @default(now())
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  application LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  policy      CreditPolicy    @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, applicationId])
   @@index([tenantId, createdAt])
 }
