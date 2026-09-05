@@ -43,6 +43,46 @@ enum ApplicationStatus {
   FAILED
 }
 
+enum BankAccountType {
+  SAVINGS
+  CURRENT
+}
+
+enum BankTransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionCategory {
+  SALARY
+  RENT
+  EMI
+  UTILITY
+  FOOD
+  TRANSFER
+  OTHER
+}
+
+enum LiabilityType {
+  PERSONAL_LOAN
+  HOME_LOAN
+  AUTO_LOAN
+  CREDIT_CARD
+  OTHER
+}
+
+enum LiabilityStatus {
+  ACTIVE
+  CLOSED
+  DEFAULTED
+}
+
+enum IdentityVerificationStatus {
+  VERIFIED
+  FAILED
+  PENDING
+}
+
 model Tenant {
   id           String            @id @default(uuid()) @db.Uuid
   name         String
@@ -52,6 +92,11 @@ model Tenant {
   updatedAt    DateTime          @updatedAt
   customers    Customer[]
   applications LoanApplication[]
+  creditProfiles CreditProfile[]
+  bankAccounts BankAccount[]
+  bankTransactions BankTransaction[]
+  liabilities Liability[]
+  identityVerifications IdentityVerification[]
 
   // All tenant-owned models should reference this model through a tenantId UUID.
   memberships UserTenantMembership[]
@@ -100,10 +145,105 @@ model Customer {
 
   tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   applications LoanApplication[]
+  creditProfile CreditProfile?
+  bankAccounts BankAccount[]
+  bankTransactions BankTransaction[]
+  liabilities Liability[]
+  identityVerifications IdentityVerification[]
 
   @@unique([tenantId, externalReference])
   @@index([tenantId])
   @@index([tenantId, createdAt])
+}
+
+model CreditProfile {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  customerId String @unique @db.Uuid
+  creditScore Int
+  totalAccounts Int
+  activeAccounts Int
+  totalOutstanding Decimal @db.Decimal(15, 2)
+  latePayments Int
+  hardInquiries Int
+  creditAgeMonths Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  @@index([tenantId, customerId])
+}
+
+model BankAccount {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  customerId String @db.Uuid
+  institutionName String
+  accountType BankAccountType
+  maskedAccountNumber String
+  currentBalance Decimal @db.Decimal(15, 2)
+  availableBalance Decimal @db.Decimal(15, 2)
+  openedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  transactions BankTransaction[]
+  @@index([tenantId, customerId])
+}
+
+model BankTransaction {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  bankAccountId String @db.Uuid
+  customerId String @db.Uuid
+  transactionDate DateTime
+  type BankTransactionType
+  amount Decimal @db.Decimal(15, 2)
+  category TransactionCategory
+  description String
+  balanceAfter Decimal @db.Decimal(15, 2)
+  createdAt DateTime @default(now())
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  @@index([tenantId, customerId, transactionDate])
+  @@index([tenantId, bankAccountId])
+}
+
+model Liability {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  customerId String @db.Uuid
+  type LiabilityType
+  lenderName String
+  originalAmount Decimal @db.Decimal(15, 2)
+  outstandingAmount Decimal @db.Decimal(15, 2)
+  monthlyEmi Decimal @db.Decimal(15, 2)
+  interestRate Decimal @db.Decimal(5, 2)
+  startDate DateTime
+  endDate DateTime?
+  status LiabilityStatus
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  @@index([tenantId, customerId])
+}
+
+model IdentityVerification {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  customerId String @db.Uuid
+  status IdentityVerificationStatus
+  provider String
+  reference String
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  @@index([tenantId, customerId])
 }
 
 model LoanApplication {
