@@ -38,7 +38,6 @@ export const createAuthRouter = (prisma: PrismaClient) => {
 
   router.post('/register', validateRequest(registerSchema), async (req, res, next) => {
     try {
-      
       const { user, tenant } = await authService.register(
         prisma,
         req.body as z.infer<typeof registerSchema>,

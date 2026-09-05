@@ -63,18 +63,26 @@ export const createTenantRouter = (prisma: PrismaClient) => {
     }
   });
 
-  router.get('/:tenantId', validateRequest(tenantParamsSchema, 'params'), async (req, res, next) => {
-    try {
-      const { tenantId } = req.params as z.infer<typeof tenantParamsSchema>;
-      const membership = await tenantService.findForUser(prisma, req.auth!.userId, tenantId);
-      if (!membership) {
-        throw new AppError('You do not belong to the requested tenant', 403, 'TENANT_ACCESS_DENIED');
+  router.get(
+    '/:tenantId',
+    validateRequest(tenantParamsSchema, 'params'),
+    async (req, res, next) => {
+      try {
+        const { tenantId } = req.params as z.infer<typeof tenantParamsSchema>;
+        const membership = await tenantService.findForUser(prisma, req.auth!.userId, tenantId);
+        if (!membership) {
+          throw new AppError(
+            'You do not belong to the requested tenant',
+            403,
+            'TENANT_ACCESS_DENIED',
+          );
+        }
+        res.status(200).json({ tenant: serializeMembership(membership) });
+      } catch (error) {
+        next(error);
       }
-      res.status(200).json({ tenant: serializeMembership(membership) });
-    } catch (error) {
-      next(error);
-    }
-  });
+    },
+  );
 
   return router;
 };
