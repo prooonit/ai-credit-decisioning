@@ -9,7 +9,19 @@ export const creditPolicyConfigurationSchema = z.object({
   identityVerificationRequired: z.boolean(),
 });
 
+export const policyCreateSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  minCreditScore: z.number().int().positive().max(1000),
+  minMonthlyIncome: z.number().positive(),
+  maxDebtToIncomeRatio: z.number().positive().max(1),
+  maxLatePayments: z.number().int().min(0),
+  identityVerificationRequired: z.boolean(),
+}).strict();
+
+export const policyParamsSchema = z.object({ policyId: z.string().uuid() });
+
 export type CreditPolicyConfiguration = z.infer<typeof creditPolicyConfigurationSchema>;
+export type PolicyCreateInput = z.infer<typeof policyCreateSchema>;
 export type RuleStatus = 'PASS' | 'FAIL' | 'MANUAL_REVIEW';
 export type RuleResult = {
   rule: keyof CreditPolicyConfiguration | 'financialEvidence';

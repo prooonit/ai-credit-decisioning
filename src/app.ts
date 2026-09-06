@@ -11,6 +11,7 @@ import { createFinancialRouter } from './modules/financial/financial.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { createMeRouter } from './routes/me.routes.js';
 import { createTenantRouter } from './routes/tenant.routes.js';
+import { createPolicyRouter } from './modules/policy/policy.routes.js';
 
 export const createApp = (dependencies: { prisma?: PrismaClient } = {}) => {
   const prisma = dependencies.prisma ?? defaultPrisma;
@@ -26,6 +27,7 @@ export const createApp = (dependencies: { prisma?: PrismaClient } = {}) => {
   app.use('/api/v1/customers', createFinancialRouter(prisma));
   app.use('/api/v1/applications', createApplicationRouter(prisma));
   app.use('/api/v1/applications', createDecisionRouter(prisma));
+  app.use('/api/v1/policies', createPolicyRouter(prisma));
   app.use(notFoundHandler);
   app.use(errorHandler);
 
